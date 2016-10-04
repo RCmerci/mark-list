@@ -1,0 +1,18 @@
+
+* mark-list
+
+** INSTALL
+   - git clone
+   - in emacs =eval=:
+     #+begin_src  emacs-lisp
+(package-install-file "/path/to/mark-list/mark-list.el")
+     #+end_src
+
+** Commands
+   - mark-list/mark-here
+   - mark-list/show-marks
+
+
+** Package required
+   - ivy
+
