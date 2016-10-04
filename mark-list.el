@@ -4,6 +4,8 @@
 
 ;; Author: zaijian <zaijian@zaijiandeMacBook-Pro.local>
 ;; Keywords: convenience
+;; Package-Requires: ((emacs "24.4") (ivy "20160913.535"))
+;; Version: 20161005.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
