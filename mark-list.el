@@ -28,6 +28,8 @@
 
 (require 'ivy)
 
+(eval-when-compile (require 'names))
+
 (define-namespace mark-list/		;namespace
 
 
@@ -37,6 +39,9 @@
 (defvar /mark-list
   ()
   "mark list")
+
+(defvar /overlay-stack nil
+  "overlay stack")
 
 
 (defun /make-mark (origin-content pos buffer &optional desc)
@@ -56,6 +61,37 @@ length of line content is less then 70.
     (put-text-property 81 82 'display "" format-content)
     format-content
     )
+  )
+
+(defmacro /get (property mark)
+  "
+(/get buffer-name m)
+(/get char-pos m)
+"
+  `(get-text-property 0 ',property ,mark))
+
+
+(defun /make-overlay (beg end)
+  (let ((ov (make-overlay beg end)))
+    (setq /overlay-stack (cons ov /overlay-stack))
+    ov)
+  )
+
+
+(defmacro /save-overlay (body)
+  ";TODO: explantion"
+  `(let ((origin-overlay-num (length /overlay-stack)))
+     ,body
+     (dolist (ov /overlay-stack)
+       (delete-overlay ov))
+     (setq /overlay-stack nil)
+     )
+  )
+
+(defun /clear-overlay ()
+  (dolist (ov /overlay-stack)
+    (delete-overlay ov))
+  (setq /overlay-stack nil)
   )
 
 ;;;###autoload
@@ -108,7 +144,9 @@ length of line content is less then 70.
 	  (progn
 	    (switch-to-buffer origin-buffer)
 	    (goto-char origin-pos))
-	(/goto-char-pos res))
+	(if (/buffer-exist? res)
+	    (/goto-char-pos res)
+	  (message (format "buffer: <%s> has been killed" (/get buffer-name res)))))
       ))
   )
 
@@ -119,29 +157,29 @@ length of line content is less then 70.
 	(cons a (cl-remove a /mark-list :test 'equal-including-properties)))
   )
 
+
 (defun /update-input-ivy ()
   "called when `ivy' input is updated."
+  (/clear-overlay)
   (with-ivy-window
-    (save-excursion
-      (let* ((buffer-name (get-text-property 0 'buffer-name ivy--current))
-	     ;; (char-pos-aux (get-text-property 0 'char-pos ivy--current))
-	     ;; (char-pos (if (stringp char-pos-aux)
-	     ;; 		   (string-to-int char-pos-aux)
-	     ;; 		 char-pos-aux))
-	     )
-
-	(if (not (get-buffer buffer-name))
-	    nil				;if buffer not opened, just skip it
-	  (/goto-char-pos ivy--current)
+    (let ((buffer-name (/get buffer-name ivy--current)))
+      (when (and (< 0 (length buffer-name))
+		 (get-buffer buffer-name))
+	(/goto-char-pos ivy--current)
+	(let ((ov (/make-overlay
+		   (line-beginning-position)
+		   (1+ (line-end-position)))))
+	  (overlay-put ov 'face 'highlight)
 	  )
 	)
       )
+    
     )
   )
 
 (defun /goto-char-pos (mark)
-  (let ((buffer (get-text-property 0 'buffer-name mark))
-	(char-pos (get-text-property 0 'char-pos mark)))
+  (let ((buffer (/get buffer-name mark))
+	(char-pos (/get char-pos mark)))
     (switch-to-buffer buffer)
     (goto-char char-pos)
     )
@@ -151,18 +189,25 @@ length of line content is less then 70.
   ;;MARK here is not normal mark in emacs,
   ;;but a string with properties,
   ;;see also in comment of `mark-list//make-mark'
-  (let ((current-buffer (get-buffer (get-text-property 0 'buffer-name mark))))
+  (let ((current-buffer (get-buffer (/get buffer-name mark))))
     (if (not current-buffer)
 	nil
       (with-current-buffer current-buffer
 	(save-excursion
-	  (let ((origin-pos (get-text-property 0 'char-pos mark)))
+	  (let ((origin-pos (/get char-pos mark)))
 	    (goto-char origin-pos)
 	    (let ((current-line-content
 		   (buffer-substring-no-properties (line-beginning-position)
 						   (line-end-position))))
-	      (not (equal current-line-content (get-text-property 0 'origin-content mark))))
+	      (not (equal current-line-content (/get origin-content mark))))
 	    ))))))
+
+(defun /buffer-exist? (mark)
+  (let ((buffer-name (/get buffer-name mark)))
+    (and (< 0 (length buffer-name))
+	 (get-buffer buffer-name)) 
+    )
+  )
 
 
 )
