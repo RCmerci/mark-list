@@ -153,6 +153,7 @@ length of line content is less then 70.
 
 (defun /action-ivy (a)
   "treat the last chosen mark as 1st one."
+  (/clear-overlay)
   (setq /mark-list
 	(cons a (cl-remove a /mark-list :test 'equal-including-properties)))
   )
