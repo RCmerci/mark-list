@@ -30,6 +30,7 @@
 
 (eval-when-compile (require 'names))
 
+
 (define-namespace mark-list/		;namespace
 
 
@@ -43,6 +44,13 @@
 (defvar /overlay-stack nil
   "overlay stack")
 
+(defvar handle-candidate-hook nil
+  "setup candidates before showing marks.
+if function in hook return nil, drop this candidate;
+                    return t  , keep it;
+                    return mark, change origin one to new mark.
+")
+
 
 (defun /make-mark (origin-content pos buffer &optional desc)
   "create a mark.
@@ -53,7 +61,7 @@ mark looks like this：
 )
 length of line content is less then 70.
 "
-  (let ((format-content (format "%-70.70s            " origin-content)))
+  (let ((format-content (format "%-70.70s            " (replace-regexp-in-string "\t" "    " origin-content))))
     (put-text-property 0 1 'buffer-name buffer format-content)
     (put-text-property 0 1 'char-pos pos format-content)
     (put-text-property 0 1 'origin-content origin-content format-content)
@@ -118,10 +126,42 @@ length of line content is less then 70.
   (if (/modified? mark)
       (put-text-property 81 82 'display "[M]" mark)
     (put-text-property 81 82 'display "" mark))
+  t
   )
 
-(defun /candidate-with-check-modified ()
-  (cl-mapc #'/update-modify-flag-in-mark /mark-list))
+(defun /killed-buffer-filter (mark)
+  (if (get-buffer (/get buffer-name mark))
+      t
+    nil))
+
+
+(defun /handle-mark (mark handlers)
+  (if (null handlers)
+      mark
+    (let ((handler (car handlers)))
+      (if mark
+	  (let ((res (funcall handler mark)))
+	  (if (equal t res)
+	      (/handle-mark mark (cdr handlers))
+	    (if (stringp res)
+		(/handle-mark res (cdr handlers))
+	      nil)))
+	nil
+	))))
+
+
+(defun /get-candidates ()
+  (let ((res-mark-list nil))
+    (dolist (mark (reverse /mark-list))
+      (let ((handled-mark (/handle-mark mark handle-candidate-hook)))
+	(message handled-mark)
+	(when handled-mark
+	  (push handled-mark res-mark-list))
+	))
+    res-mark-list
+    )
+  )
+
 
 ;;;###autoload
 (defun show-marks ()
@@ -133,20 +173,23 @@ length of line content is less then 70.
     (unwind-protect
 	(setq res
 	      (ivy-read "marks: "
-			(/candidate-with-check-modified)
+			(/get-candidates)
+			;; (/candidate-with-check-modified)
 			:require-match t
 			;; :initial-input last-chosen-mark
 			:update-fn #'/update-input-ivy
 			:action #'/action-ivy
 			:caller "mark-list/show-marks"
 			))
-      (if (not res)
-	  (progn
-	    (switch-to-buffer origin-buffer)
-	    (goto-char origin-pos))
-	(if (/buffer-exist? res)
-	    (/goto-char-pos res)
-	  (message (format "buffer: <%s> has been killed" (/get buffer-name res)))))
+      (progn
+	(/clear-overlay)
+	(if (not res)
+	    (progn
+	      (switch-to-buffer origin-buffer)
+	      (goto-char origin-pos))
+	  (if (/buffer-exist? res)
+	      (/goto-char-pos res)
+	    (message (format "buffer: <%s> has been killed" (/get buffer-name res))))))
       ))
   )
 
@@ -212,6 +255,13 @@ length of line content is less then 70.
 
 
 )
+
+(when (null mark-list/handle-candidate-hook)
+    (add-hook 'mark-list/handle-candidate-hook #'mark-list//update-modify-flag-in-mark)
+    (add-hook 'mark-list/handle-candidate-hook #'mark-list//killed-buffer-filter )
+  )
+
+
 
 (provide 'mark-list)
 ;;; mark-list.el ends here
