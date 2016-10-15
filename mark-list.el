@@ -71,36 +71,6 @@ length of line content is less then 70.
     )
   )
 
-(defmacro /get (property mark)
-  "
-(/get buffer-name m)
-(/get char-pos m)
-"
-  `(get-text-property 0 ',property ,mark))
-
-
-(defun /make-overlay (beg end)
-  (let ((ov (make-overlay beg end)))
-    (setq /overlay-stack (cons ov /overlay-stack))
-    ov)
-  )
-
-
-(defmacro /save-overlay (body)
-  ";TODO: explantion"
-  `(let ((origin-overlay-num (length /overlay-stack)))
-     ,body
-     (dolist (ov /overlay-stack)
-       (delete-overlay ov))
-     (setq /overlay-stack nil)
-     )
-  )
-
-(defun /clear-overlay ()
-  (dolist (ov /overlay-stack)
-    (delete-overlay ov))
-  (setq /overlay-stack nil)
-  )
 
 ;;;###autoload
 (defun mark-here (desc)
@@ -118,6 +88,7 @@ length of line content is less then 70.
 		(if (>= (length /mark-list) /mark-list-max-length)
 		    (cdr /mark-list)
 		  /mark-list)))
+    (message "mark here")
     )
   )
 
@@ -217,9 +188,57 @@ length of line content is less then 70.
 	  )
 	)
       )
-    
     )
   )
+
+(defun /make-overlay (beg end)
+  (let ((ov (make-overlay beg end)))
+    (setq /overlay-stack (cons ov /overlay-stack))
+    ov)
+  )
+
+
+
+(defun /clear-overlay ()
+  (dolist (ov /overlay-stack)
+    (delete-overlay ov))
+  (setq /overlay-stack nil)
+  )
+
+(defun /delete-mark (mark)
+  (setq /mark-list
+	(cl-remove-if (lambda (m)
+			(/mark-equal m mark))
+		      /mark-list
+		      :count 1))
+    
+  )
+
+
+;;; ================utils================
+(defmacro /get (property mark)
+  "
+(/get buffer-name m)
+(/get char-pos m)
+"
+  `(get-text-property 0 ',property ,mark))
+
+
+(defun /mark-equal (m1 m2)
+  (and
+   (equal
+    (/get buffer-name m1)
+    (/get buffer-name m2)
+    )
+   (equal
+    (/get char-pos m1)
+    (/get char-pos m2))
+   (equal
+    (/get origin-content m1)
+    (/get origin-content m2)))
+  )
+
+
 
 (defun /goto-char-pos (mark)
   (let ((buffer (/get buffer-name mark))
@@ -253,15 +272,19 @@ length of line content is less then 70.
     )
   )
 
-
 )
 
-(when (null mark-list/handle-candidate-hook)
+
+
+
+(when (null mark-list/handle-candidate-hook) ;; init hook
     (add-hook 'mark-list/handle-candidate-hook #'mark-list//update-modify-flag-in-mark)
     (add-hook 'mark-list/handle-candidate-hook #'mark-list//killed-buffer-filter )
   )
 
-
+(ivy-set-actions
+ 'mark-list/show-marks
+ '(("d" mark-list//delete-mark "delete mark")))
 
 (provide 'mark-list)
 ;;; mark-list.el ends here
