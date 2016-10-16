@@ -72,25 +72,8 @@ length of line content is less then 70.
   )
 
 
-;;;###autoload
-(defun mark-here (desc)
-  "make a mark at point"
-  (interactive
-   (list
-    (if current-prefix-arg
-	(read-from-minibuffer "desc: ")
-      nil)))
-  (let* ((line-begin (line-beginning-position))
-	 (line-end (line-end-position))
-	 (line-content (buffer-substring-no-properties line-begin line-end)))
-    (setq /mark-list
-	  (cons (/make-mark line-content (point) (buffer-name) desc)
-		(if (>= (length /mark-list) /mark-list-max-length)
-		    (cdr /mark-list)
-		  /mark-list)))
-    (message "mark here")
-    )
-  )
+
+
 
 
 (defun /update-modify-flag-in-mark (mark)
@@ -134,35 +117,8 @@ length of line content is less then 70.
   )
 
 
-;;;###autoload
-(defun show-marks ()
-  "show mark list. "
-  (interactive)
-  (let ((origin-buffer (buffer-name))
-	(origin-pos (point))
-	res)
-    (unwind-protect
-	(setq res
-	      (ivy-read "marks: "
-			(/get-candidates)
-			;; (/candidate-with-check-modified)
-			:require-match t
-			;; :initial-input last-chosen-mark
-			:update-fn #'/update-input-ivy
-			:action #'/action-ivy
-			:caller "mark-list/show-marks"
-			))
-      (progn
-	(/clear-overlay)
-	(if (not res)
-	    (progn
-	      (switch-to-buffer origin-buffer)
-	      (goto-char origin-pos))
-	  (if (/buffer-exist? res)
-	      (/goto-char-pos res)
-	    (message (format "buffer: <%s> has been killed" (/get buffer-name res))))))
-      ))
-  )
+
+
 
 
 (defun /action-ivy (a)
@@ -275,6 +231,58 @@ length of line content is less then 70.
 )
 
 
+;;;###autoload
+(defun mark-list/mark-here (desc)
+  "make a mark at point"
+  (interactive
+   (list
+    (if current-prefix-arg
+	(read-from-minibuffer "desc: ")
+      nil)))
+  (let* ((line-begin (line-beginning-position))
+	 (line-end (line-end-position))
+	 (line-content (buffer-substring-no-properties line-begin line-end)))
+    (setq mark-list//mark-list
+	  (cons (mark-list//make-mark line-content (point) (buffer-name) desc)
+		(if (>= (length mark-list//mark-list) mark-list//mark-list-max-length)
+		    (cdr mark-list//mark-list)
+		  mark-list//mark-list)))
+    (message "mark here")
+    )
+  )
+
+
+;;;###autoload
+(defun mark-list/show-marks ()
+  "show mark list. "
+  (interactive)
+  (let ((origin-buffer (buffer-name))
+	(origin-pos (point))
+	res)
+    (unwind-protect
+	(setq res
+	      (ivy-read "marks: "
+			(mark-list//get-candidates)
+			;; (/candidate-with-check-modified)
+			:require-match t
+			;; :initial-input last-chosen-mark
+			:update-fn #'mark-list//update-input-ivy
+			:action #'mark-list//action-ivy
+			:caller "mark-list/show-marks"
+			))
+      (progn
+	(mark-list//clear-overlay)
+	(if (not res)
+	    (progn
+	      (switch-to-buffer origin-buffer)
+	      (goto-char origin-pos))
+	  (if (mark-list//buffer-exist? res)
+	      (mark-list//goto-char-pos res)
+	    (message (format "buffer: <%s> has been killed" (mark-list//get buffer-name res))))))
+      ))
+  )
+
+
 
 
 (when (null mark-list/handle-candidate-hook) ;; init hook
@@ -285,6 +293,12 @@ length of line content is less then 70.
 (ivy-set-actions
  'mark-list/show-marks
  '(("d" mark-list//delete-mark "delete mark")))
+
+
+
+
+
+
 
 (provide 'mark-list)
 ;;; mark-list.el ends here
